@@ -7,7 +7,7 @@ import time
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from gensim.models import KeyedVectors
+# from gensim.models import KeyedVectors
 
 from models.Baselines import *
 from models.FANVM import FANVMModel
@@ -140,6 +140,44 @@ def SVFEND_collate_fn(batch):
         'comments_inputid': comments_inputid,
         'comments_mask': comments_mask,
         'comments_like': torch.stack(comments_like),
+        'audioframes': audioframes,
+        'audioframes_masks': audioframes_masks,
+        'frames':frames,
+        'frames_masks': frames_masks,
+        'c3d': c3d,
+        'c3d_masks': c3d_masks,
+    }
+
+def my_collate_fn(batch): 
+    num_comments = 23 
+    num_frames = 83
+    num_audioframes = 50 
+
+    title_inputid = [item['title_inputid'] for item in batch]
+    title_mask = [item['title_mask'] for item in batch]
+
+    comments_inputid = [item['comments_inputid'] for item in batch]
+    comments_mask = [item['comments_mask'] for item in batch]
+
+    frames = [item['frames'] for item in batch]
+    frames, frames_masks = pad_frame_sequence(num_frames, frames)
+
+    audioframes  = [item['audioframes'] for item in batch]
+    audioframes, audioframes_masks = pad_frame_sequence(num_audioframes, audioframes)
+
+    c3d  = [item['c3d'] for item in batch]
+    c3d, c3d_masks = pad_frame_sequence(num_frames, c3d)
+
+    label = [item['label'] for item in batch]
+
+    return {
+        'label': torch.stack(label),
+        'title_inputid': torch.stack(title_inputid),
+        'title_mask': torch.stack(title_mask),
+
+        # 'comments_inputid': comments_inputid,
+        # 'comments_mask': comments_mask,
+
         'audioframes': audioframes,
         'audioframes_masks': audioframes_masks,
         'frames':frames,
@@ -335,9 +373,13 @@ class Run():
         collate_fn=None
 
         if data_type=='SVFEND':
-            dataset_train = SVFENDDataset(f'vid_fold_no_{data_fold}.txt')
-            dataset_test = SVFENDDataset(f'vid_fold_{data_fold}.txt')
-            collate_fn=SVFEND_collate_fn
+            # dataset_train = SVFENDDataset(f'vid_fold_no_{data_fold}.txt')
+            # dataset_test = SVFENDDataset(f'vid_fold_{data_fold}.txt')
+            with open('/home/chen/wzh/FakeSV/data/dict_vid_audioconvfea.pkl', "rb") as fr:
+                dict_vid_convfea = pickle.load(fr)
+            dataset_train = myDataset(mode="train", dict_vid_convfea=dict_vid_convfea)
+            dataset_test = myDataset(mode="test", dict_vid_convfea=dict_vid_convfea)
+            collate_fn=my_collate_fn
         elif data_type=='FANVM':
             dataset_train = FANVMDataset_train(f'vid_fold_no_{data_fold}.txt')
             dataset_test = FANVMDataset_test(path_vid_train=f'vid_fold_no_{data_fold}.txt', path_vid_test=f'vid_fold_{data_fold}.txt')
@@ -425,7 +467,7 @@ class Run():
 
     def get_model(self):
         if self.model_name == 'SVFEND':
-            self.model = SVFENDModel(bert_model='bert-base-chinese', fea_dim=128,dropout=self.dropout)
+            self.model = SVFENDModel(bert_model='bert-base-chinese', fea_dim=128, dropout=self.dropout)
         elif self.model_name == 'FANVM':
             self.model = FANVMModel(bert_model='bert-base-chinese', fea_dim=128)
             self.data_type = "FANVM"
@@ -486,7 +528,7 @@ class Run():
                 dataloaders = self.get_dataloader(data_type=self.data_type, data_fold=fold)
                 trainer = Trainer(model = self.model, device = self.device, lr = self.lr, dataloaders = dataloaders, epoches = self.epoches, dropout = self.dropout, weight_decay = self.weight_decay, mode = self.mode, model_name = self.model_name, event_num = self.event_num, 
                     epoch_stop = self.epoch_stop, save_param_path = self.save_param_dir+self.data_type+"/"+self.model_name+"/", writer = SummaryWriter(self.path_tensorboard+"fold_"+str(fold)+"/"))
-       
+
                 result = trainer.train()
 
                 history['auc'].append(result['auc'])

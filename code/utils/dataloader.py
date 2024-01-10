@@ -15,6 +15,7 @@ from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import TfidfVectorizer
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
+from transformers import AutoTokenizer, AutoModelForMaskedLM
 
 def str2num(str_x):
     if isinstance(str_x, float):
@@ -141,6 +142,74 @@ class SVFENDDataset(Dataset):
             'comments_like': comments_like,
             'intro_inputid': intro_inputid,
             'intro_mask': intro_mask,
+        }
+
+import json
+import os
+class myDataset(Dataset):
+
+    def __init__(self, mode = "train", dict_vid_convfea=None):
+
+        self.dict_vid_convfea = dict_vid_convfea
+        self.framefeapath='/home/chen/wzh/FakeSV/data/ptvgg19_frames'
+        self.c3dfeapath='/home/chen/wzh/FakeSV/data/c3d'
+
+        datapath = "/home/chen/wzh/FakeSV/data/mydata_" + mode + ".json"
+
+        with open(datapath, "r", encoding="utf-8") as f:
+            data1 = json.load(f)
+
+        self.data = data1
+
+        self.tokenizer = BertTokenizer.from_pretrained("/home/chen/wzh/FakeSV/code/bert-base-chinese", local_files_only= True)
+
+    def __len__(self):
+        return len(self.data)
+     
+    def __getitem__(self, idx):
+        item = self.data[idx]
+        vid = item['video_id']
+
+        # label 
+        label = 0 if item['annotation']=='真' else 1
+        label = torch.tensor(label)
+
+        # text title
+        title_tokens = self.tokenizer(item['title'], max_length=128, padding='max_length', truncation=True)
+        title_inputid = torch.LongTensor(title_tokens['input_ids'])
+        title_mask = torch.LongTensor(title_tokens['attention_mask'])
+
+        # comments
+        comments_inputid = []
+        comments_mask = []
+        for comment in item['comments']:
+            comment_tokens = self.tokenizer(comment, max_length=256, padding='max_length', truncation=True)
+            comments_inputid.append(comment_tokens['input_ids'])
+            comments_mask.append(comment_tokens['attention_mask'])
+        comments_inputid = torch.LongTensor(np.array(comments_inputid)) 
+        comments_mask = torch.LongTensor(np.array(comments_mask))
+        
+        # audio
+        audioframes = self.dict_vid_convfea[vid]
+        audioframes = torch.FloatTensor(audioframes)
+        
+        # frames
+        frames=pickle.load(open(os.path.join(self.framefeapath,vid+'.pkl'),'rb'))
+        frames=torch.FloatTensor(frames)
+        
+        # video
+        c3d = h5py.File(os.path.join(self.c3dfeapath, vid+".hdf5"), "r")[vid]['c3d_features']
+        c3d = torch.FloatTensor(np.array(c3d))
+
+        return {
+            'label': label,
+            'title_inputid': title_inputid,
+            'title_mask': title_mask,
+            'audioframes': audioframes,
+            'frames':frames,
+            'c3d': c3d,
+            'comments_inputid': comments_inputid,
+            'comments_mask': comments_mask,
         }
 
 
