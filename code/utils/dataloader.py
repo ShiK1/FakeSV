@@ -182,12 +182,21 @@ class myDataset(Dataset):
         # comments
         comments_inputid = []
         comments_mask = []
+        c = ""
         for comment in item['comments']:
-            comment_tokens = self.tokenizer(comment, max_length=256, padding='max_length', truncation=True)
-            comments_inputid.append(comment_tokens['input_ids'])
-            comments_mask.append(comment_tokens['attention_mask'])
-        comments_inputid = torch.LongTensor(np.array(comments_inputid)) 
-        comments_mask = torch.LongTensor(np.array(comments_mask))
+            c += comment
+        if c:
+            comment_tokens = self.tokenizer(c, max_length=512, padding='max_length', truncation=True)
+            
+            comments_inputid = comment_tokens['input_ids']
+            comments_mask = comment_tokens['attention_mask']
+        else:
+            comment_tokens = self.tokenizer(item['keywords'], max_length=512, padding='max_length', truncation=True)
+            comments_inputid = torch.LongTensor(title_tokens['input_ids'])
+            comments_mask = torch.LongTensor(title_tokens['attention_mask'])
+
+        comments_inputid = torch.LongTensor(comments_inputid) 
+        comments_mask = torch.LongTensor(comments_mask)
         
         # audio
         audioframes = self.dict_vid_convfea[vid]

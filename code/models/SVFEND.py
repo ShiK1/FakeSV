@@ -94,15 +94,19 @@ class SVFENDModel(torch.nn.Module):
         fea_video = torch.mean(fea_video, -2)
 
         ### Comment ###
-
+        comments_inputid = kwargs['comments_inputid']#(batch,20,250)
+        comments_mask=kwargs['comments_mask']#(batch,20,250)
+        bert_fea=self.bert(comments_inputid, attention_mask=comments_mask)['last_hidden_state']
+        fea_comments = bert_fea
+        fea_comments = self.linear_comment(fea_comments[:,-1,:])
 
         fea_text = fea_text.unsqueeze(1)
-        # fea_comments = fea_comments.unsqueeze(1)
+        fea_comments = fea_comments.unsqueeze(1)
         fea_img = fea_img.unsqueeze(1)
         fea_audio = fea_audio.unsqueeze(1)
         fea_video = fea_video.unsqueeze(1)
 
-        fea=torch.cat((fea_text,fea_audio, fea_video,fea_img),1) # (bs, 6, 128)
+        fea=torch.cat((fea_text,fea_audio, fea_comments, fea_video,fea_img),1) # (bs, 6, 128)
         fea = self.trm(fea)
         fea = torch.mean(fea, -2)
         

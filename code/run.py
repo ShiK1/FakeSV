@@ -175,8 +175,8 @@ def my_collate_fn(batch):
         'title_inputid': torch.stack(title_inputid),
         'title_mask': torch.stack(title_mask),
 
-        # 'comments_inputid': comments_inputid,
-        # 'comments_mask': comments_mask,
+        'comments_inputid': torch.stack(comments_inputid),
+        'comments_mask': torch.stack(comments_mask),
 
         'audioframes': audioframes,
         'audioframes_masks': audioframes_masks,
